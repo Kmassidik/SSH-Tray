@@ -23,8 +23,8 @@ const RAISED_BG: Color32 = Color32::from_rgb(27, 30, 36);
 const BORDER: Color32 = Color32::from_rgb(43, 47, 56);
 const TEXT: Color32 = Color32::from_rgb(235, 238, 244);
 const MUTED: Color32 = Color32::from_rgb(145, 153, 166);
-const ACCENT: Color32 = Color32::from_rgb(110, 115, 245);
-const ACCENT_HOVER: Color32 = Color32::from_rgb(133, 137, 250);
+const ACCENT: Color32 = Color32::from_rgb(225, 228, 234);
+const ACCENT_HOVER: Color32 = Color32::from_rgb(255, 255, 255);
 const SUCCESS: Color32 = Color32::from_rgb(79, 198, 139);
 const ERROR: Color32 = Color32::from_rgb(244, 113, 122);
 
@@ -437,7 +437,7 @@ impl Panel {
                     let selected = self.selected_key == Some(index);
                     let frame = Frame::new()
                         .fill(if selected {
-                            Color32::from_rgba_unmultiplied(110, 115, 245, 28)
+                            Color32::from_rgba_unmultiplied(235, 238, 244, 12)
                         } else {
                             CARD_BG
                         })
@@ -1457,7 +1457,7 @@ fn configure_theme(ctx: &Context) {
     style.visuals.hyperlink_color = ACCENT_HOVER;
     style.visuals.warn_fg_color = Color32::from_rgb(235, 181, 95);
     style.visuals.error_fg_color = ERROR;
-    style.visuals.selection.bg_fill = Color32::from_rgba_unmultiplied(110, 115, 245, 85);
+    style.visuals.selection.bg_fill = Color32::from_rgba_unmultiplied(235, 238, 244, 60);
     style.visuals.selection.stroke = Stroke::new(1.0_f32, ACCENT_HOVER);
     style.visuals.widgets.noninteractive = WidgetVisuals {
         bg_fill: CARD_BG,
@@ -1488,7 +1488,7 @@ fn configure_theme(ctx: &Context) {
         weak_bg_fill: ACCENT,
         bg_stroke: Stroke::new(1.0_f32, ACCENT_HOVER),
         corner_radius: CornerRadius::same(7),
-        fg_stroke: Stroke::new(1.0_f32, Color32::WHITE),
+        fg_stroke: Stroke::new(1.0_f32, APP_BG),
         expansion: 0.0,
     };
     style.visuals.widgets.open = style.visuals.widgets.hovered;
@@ -1500,7 +1500,7 @@ fn icon_text(icon: &str, text: &str) -> String {
 }
 
 fn primary_button(text: impl Into<String>) -> egui::Button<'static> {
-    egui::Button::new(RichText::new(text.into()).strong().color(Color32::WHITE))
+    egui::Button::new(RichText::new(text.into()).strong().color(APP_BG))
         .fill(ACCENT)
         .stroke(Stroke::new(1.0_f32, ACCENT_HOVER))
         .corner_radius(CornerRadius::same(7))
@@ -1534,12 +1534,12 @@ fn tab_button(ui: &mut Ui, selected: bool, icon: &str, text: &str) -> egui::Resp
                 .color(if selected { TEXT } else { MUTED }),
         )
         .fill(if selected {
-            Color32::from_rgba_unmultiplied(110, 115, 245, 32)
+            Color32::from_rgba_unmultiplied(235, 238, 244, 16)
         } else {
             Color32::TRANSPARENT
         })
         .stroke(if selected {
-            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(110, 115, 245, 110))
+            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(235, 238, 244, 120))
         } else {
             Stroke::NONE
         })
@@ -1554,11 +1554,7 @@ fn brand_mark(ui: &mut Ui) {
         .corner_radius(CornerRadius::same(9))
         .inner_margin(Margin::same(10))
         .show(ui, |ui| {
-            ui.label(
-                RichText::new(TERMINAL_WINDOW)
-                    .size(19.0)
-                    .color(Color32::WHITE),
-            );
+            ui.label(RichText::new(TERMINAL_WINDOW).size(19.0).color(APP_BG));
         });
 }
 
@@ -1640,7 +1636,7 @@ fn host_row(
 ) -> egui::Response {
     let frame = Frame::new()
         .fill(if selected {
-            Color32::from_rgba_unmultiplied(110, 115, 245, 28)
+            Color32::from_rgba_unmultiplied(235, 238, 244, 12)
         } else {
             CARD_BG
         })

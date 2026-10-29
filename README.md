@@ -2,7 +2,7 @@
 
 A native SSH menu-bar and management app written in Rust. Connect to saved hosts in one click, organize machines by network, and manage SSH hosts and keys without editing config files by hand.
 
-<img src="assets/sidebar-demo.png" alt="SSH Tray sidebar showing fictional demo hosts" width="270">
+<img src="assets/panel-demo.png" alt="Monochrome SSH Tray sidebar and host details with fictional demo data" width="960">
 
 *The screenshot contains only fictional hosts, `example.com` domains, and TEST-NET addresses. No real SSH data is included.*
 
