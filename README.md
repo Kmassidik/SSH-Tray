@@ -40,7 +40,7 @@ Linux requires a graphical desktop and an AppIndicator-compatible system tray. `
 git clone git@github.com:Kmassidik/SSH-Tray.git
 cd SSH-Tray
 nix develop
-cargo run
+cargo run --bin ssh-tray
 ```
 
 Click the tray icon and select a host. Choose **Open Panel** to manage hosts and keys, **Refresh** to reload the config manually, or **Quit** to exit.
@@ -48,7 +48,7 @@ Click the tray icon and select a host. Choose **Open Panel** to manage hosts and
 Open the management panel directly during development:
 
 ```sh
-cargo run -- --panel
+cargo run --bin ssh-tray-panel --features panel
 ```
 
 ## Build
@@ -66,14 +66,14 @@ The bundle uses `LSUIElement`, so SSH Tray runs in the menu bar without a Dock i
 
 ```sh
 nix develop
-cargo build --release
+cargo build --release --features panel --bins
 ./target/release/ssh-tray
 ```
 
 Open only the management panel:
 
 ```sh
-./target/release/ssh-tray --panel
+./target/release/ssh-tray-panel
 ```
 
 ## SSH host configuration
@@ -149,33 +149,71 @@ Run checks:
 
 ```sh
 cargo test
+cargo test --features panel
 cargo-fmt -- --check
-cargo-clippy clippy -- -D warnings
+cargo-clippy clippy --all-targets --features panel -- -D warnings
 ```
 
 Or run them without entering the shell:
 
 ```sh
 nix develop --command cargo test
+nix develop --command cargo test --features panel
 nix develop --command cargo-fmt -- --check
-nix develop --command cargo-clippy clippy -- -D warnings
+nix develop --command cargo-clippy clippy --all-targets --features panel -- -D warnings
 ```
+
+## Resource usage
+
+The always-running tray and on-demand panel are separate executables. The tray does not link `eframe`, `egui`, `rfd`, or `tao` on macOS; it uses AppKit directly. Release builds use thin LTO, one codegen unit, symbol stripping, and abort-on-panic.
+
+Measured on Apple Silicon:
+
+| Component | Binary size | Private footprint | RSS |
+|---|---:|---:|---:|
+| Native tray | 456 KB | 9.8 MB | 43.8 MB |
+| Management panel | 4.7 MB | 98 MB | 114 MB |
+
+RSS includes shared macOS GUI frameworks; private footprint is the more useful measure for comparing native application memory. A sub-1 MB graphical macOS process is not realistic. Keeping the panel closed avoids its memory cost entirely.
 
 ## Project structure
 
 ```text
 src/
-  app.rs       Tray icon and menu events
-  panel.rs     Native egui management panel
-  config.rs    SSH config parsing and atomic host CRUD
-  keys.rs      Public-key inventory and safe key-file operations
-  terminal.rs  Secure macOS/Linux terminal commands
+  bin/
+    ssh-tray.rs         Lightweight tray entry point
+    ssh-tray-panel.rs   On-demand panel entry point
+  app/
+    mod.rs             Platform dispatch and panel lifecycle
+    macos.rs           Direct AppKit status item and menus
+    linux.rs           AppIndicator tray and menus
+  config/
+    mod.rs             Public host model and API
+    parser.rs          Host discovery, groups, and alias deduplication
+    editor.rs          Validated CRUD and atomic config writes
+  keys/
+    mod.rs             Public key model and API
+    inventory.rs       Discovery, parsing, and fingerprints
+    files.rs           Safe import, permissions, and removal
+  panel/
+    mod.rs             Eframe setup and action coordination
+    state.rs           Panel state and selection transitions
+    theme.rs           Monochrome styling and shared widgets
+    hosts.rs           Host search, list, and details
+    keys.rs            Key list and details
+    dialogs.rs         CRUD forms and confirmations
+  terminal/
+    mod.rs             Public terminal actions and tests
+    commands.rs        Safe command construction and validation
+    macos.rs           AppleScript terminal launching
+    linux.rs           Linux terminal detection and argv
 assets/
-  tray-icon.rgba
-  sidebar-demo.png
+  tray-icon.rgba       Linux tray icon
+  tray-icon.png        AppKit tray icon
+  panel-demo.png       Fictional README screenshot
 packaging/
   Info.plist
 scripts/
   package-macos.sh
-flake.nix      macOS and Linux development shells
+flake.nix              macOS and Linux development shells
 ```

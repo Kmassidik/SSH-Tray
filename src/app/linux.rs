@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-#[cfg(target_os = "macos")]
-use tao::platform::macos::{ActivationPolicy, EventLoopExtMacOS};
 use tao::{
     event::{Event, StartCause},
     event_loop::{ControlFlow, EventLoopBuilder},
@@ -11,6 +9,7 @@ use tray_icon::{
     menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem, Submenu},
 };
 
+use super::{close_panel, open_panel};
 use crate::{config, terminal};
 
 enum AppEvent {
@@ -106,48 +105,16 @@ fn build_menu() -> Result<TrayMenu, String> {
     })
 }
 
-fn open_panel(process: &mut Option<std::process::Child>) -> Result<(), String> {
-    let running = match process.as_mut() {
-        Some(child) => match child.try_wait() {
-            Ok(None) => true,
-            Ok(Some(_)) => false,
-            Err(error) => return Err(format!("failed to inspect panel process: {error}")),
-        },
-        None => false,
-    };
-    if running {
-        return Ok(());
-    }
-
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("failed to locate ssh-tray executable: {error}"))?;
-    *process = Some(
-        std::process::Command::new(executable)
-            .arg("--panel")
-            .spawn()
-            .map_err(|error| format!("failed to open panel: {error}"))?,
-    );
-    Ok(())
-}
-
-fn close_panel(process: &mut Option<std::process::Child>) {
-    if let Some(mut child) = process.take() {
-        let _ = child.kill();
-        let _ = child.wait();
-    }
-}
-
-pub fn run() -> Result<(), String> {
-    let icon = Icon::from_rgba(include_bytes!("../assets/tray-icon.rgba").to_vec(), 22, 22)
-        .map_err(|error| format!("failed to load tray icon: {error}"))?;
+pub(super) fn run() -> Result<(), String> {
+    let icon = Icon::from_rgba(
+        include_bytes!("../../assets/tray-icon.rgba").to_vec(),
+        22,
+        22,
+    )
+    .map_err(|error| format!("failed to load tray icon: {error}"))?;
     let mut current_menu = build_menu()?;
 
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
-    #[cfg(target_os = "macos")]
-    let mut event_loop = event_loop;
-    #[cfg(target_os = "macos")]
-    event_loop.set_activation_policy(ActivationPolicy::Accessory);
-
     let menu_proxy = event_loop.create_proxy();
     MenuEvent::set_event_handler(Some(move |event| {
         let _ = menu_proxy.send_event(AppEvent::Menu(event));
@@ -170,7 +137,7 @@ pub fn run() -> Result<(), String> {
                 {
                     Ok(icon) => {
                         tray_icon = Some(icon);
-                        // Wake Tao once more so AppKit displays the newly created status item.
+                        // Wake Tao once more so the newly created status item is displayed.
                         let _ = wake_proxy.send_event(AppEvent::Wake);
                     }
                     Err(error) => {
