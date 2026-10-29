@@ -227,49 +227,55 @@ impl Panel {
         self.host_form_open = true;
     }
 
-    fn top_bar(&mut self, ui: &mut Ui) -> Option<Action> {
+    fn navigation(&mut self, ui: &mut Ui) -> Option<Action> {
         let mut action = None;
 
-        ui.horizontal_wrapped(|ui| {
+        ui.horizontal(|ui| {
             brand_mark(ui);
             ui.add_space(2.0);
             ui.vertical(|ui| {
                 ui.label(RichText::new("SSH Tray").size(18.0).strong().color(TEXT));
                 ui.label(RichText::new("Connections & keys").small().color(MUTED));
             });
-            ui.add_space(22.0);
+        });
+        ui.add_space(16.0);
+        ui.horizontal(|ui| {
             if tab_button(ui, self.active_tab == Tab::Hosts, HARD_DRIVES, "Hosts").clicked() {
                 self.active_tab = Tab::Hosts;
             }
             if tab_button(ui, self.active_tab == Tab::Keys, KEY, "SSH Keys").clicked() {
                 self.active_tab = Tab::Keys;
             }
-
-            ui.with_layout(Layout::right_to_left(eframe::egui::Align::Center), |ui| {
+        });
+        ui.add_space(10.0);
+        if ui
+            .add_sized(
+                [ui.available_width(), 34.0],
+                secondary_button(icon_text(ARROWS_CLOCKWISE, "Refresh")),
+            )
+            .on_hover_text("Reload ~/.ssh/config and public keys")
+            .clicked()
+        {
+            action = Some(Action::Refresh);
+        }
+        if self.active_tab == Tab::Keys {
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
                 if ui
-                    .add(secondary_button(icon_text(ARROWS_CLOCKWISE, "Refresh")))
-                    .on_hover_text("Reload ~/.ssh/config and public keys")
+                    .add(primary_button(icon_text(PLUS, "Generate Key")))
                     .clicked()
                 {
-                    action = Some(Action::Refresh);
+                    self.generate_error = None;
+                    self.generate_open = true;
                 }
-                if self.active_tab == Tab::Keys {
-                    if ui
-                        .add(secondary_button(icon_text(DOWNLOAD_SIMPLE, "Import Key")))
-                        .clicked()
-                    {
-                        action = Some(Action::ImportKey);
-                    }
-                    if ui
-                        .add(primary_button(icon_text(PLUS, "Generate Key")))
-                        .clicked()
-                    {
-                        self.generate_error = None;
-                        self.generate_open = true;
-                    }
+                if ui
+                    .add(secondary_button(icon_text(DOWNLOAD_SIMPLE, "Import Key")))
+                    .clicked()
+                {
+                    action = Some(Action::ImportKey);
                 }
             });
-        });
+        }
 
         if let Some(feedback) = &self.feedback {
             ui.add_space(10.0);
@@ -299,6 +305,9 @@ impl Panel {
                 });
         }
 
+        ui.add_space(12.0);
+        ui.separator();
+        ui.add_space(12.0);
         action
     }
 
@@ -1349,17 +1358,7 @@ impl eframe::App for Panel {
             self.focus_host_search = true;
         }
 
-        let mut action = egui::TopBottomPanel::top("panel_header")
-            .frame(
-                Frame::new()
-                    .fill(SIDEBAR_BG)
-                    .stroke(Stroke::new(1.0_f32, BORDER))
-                    .inner_margin(Margin::symmetric(18, 12)),
-            )
-            .show(ctx, |ui| self.top_bar(ui))
-            .inner;
-
-        egui::SidePanel::left("panel_navigation")
+        let mut action = egui::SidePanel::left("panel_navigation")
             .frame(
                 Frame::new()
                     .fill(SIDEBAR_BG)
@@ -1370,10 +1369,15 @@ impl eframe::App for Panel {
             .min_width(220.0)
             .max_width(390.0)
             .resizable(true)
-            .show(ctx, |ui| match self.active_tab {
-                Tab::Hosts => self.host_list(ui),
-                Tab::Keys => self.key_list(ui),
-            });
+            .show(ctx, |ui| {
+                let action = self.navigation(ui);
+                match self.active_tab {
+                    Tab::Hosts => self.host_list(ui),
+                    Tab::Keys => self.key_list(ui),
+                }
+                action
+            })
+            .inner;
 
         let detail_action = egui::CentralPanel::default()
             .frame(
