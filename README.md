@@ -1,67 +1,159 @@
 # SSH Tray
 
-A small macOS menu-bar app that turns the host aliases in `~/.ssh/config` into one-click SSH connections. Selecting a host opens Terminal and runs `ssh <host>`; authentication, keys, agents, and SSH options stay in your existing SSH setup.
+A native SSH menu-bar and management app written in Rust. Connect to saved hosts in one click, organize machines by network, and manage SSH hosts and keys without editing config files by hand.
+
+<img src="assets/sidebar-demo.png" alt="SSH Tray sidebar showing fictional demo hosts" width="270">
+
+*The screenshot contains only fictional hosts, `example.com` domains, and TEST-NET addresses. No real SSH data is included.*
+
+## Features
+
+- **One-click SSH** from the macOS menu bar or Linux system tray.
+- **Host CRUD:** add, edit, and delete hosts through a native panel.
+- **Network groups:** organize hosts as Office, LAN, Cloudflare, or any custom group.
+- **Clean host list:** only the first alias from each `Host` block is displayed; other aliases still work in Terminal.
+- **Safe editing:** preserves `ProxyJump`, `ProxyCommand`, `RemoteCommand`, `Control*`, comments, includes, and unrelated config blocks.
+- **Key management:** generate, inspect, copy, import, update, and remove key pairs.
+- **Secure installation:** copy a public key to a server with `ssh-copy-id`.
+- **Fast navigation:** searchable sidebar with **Cmd/Ctrl+F** to focus and **Escape** to clear.
+- **Manual refresh only:** no background host or network scanning.
+
+## Supported platforms
+
+| Platform | Architectures | Terminal support |
+|---|---|---|
+| macOS | Apple Silicon | Apple Terminal |
+| Linux | x86_64, aarch64 | `x-terminal-emulator`, GNOME Terminal, KGX, Konsole, XFCE Terminal, Alacritty, Kitty, WezTerm, Foot, or XTerm |
+
+Linux requires a graphical desktop and an AppIndicator-compatible system tray. `$TERMINAL` can select a supported terminal explicitly.
 
 ## Requirements
 
-- macOS
-- Nix with flakes enabled
-- Apple Terminal
+- Nix with flakes enabled for the reproducible development shell
+- Rust 1.95 or newer when building without Nix
+- OpenSSH tools: `ssh`, `ssh-keygen`, and `ssh-copy-id`
+- An SSH config at `~/.ssh/config`
 
-## Develop
+## Quick start
 
 ```sh
+git clone git@github.com:Kmassidik/SSH-Tray.git
+cd SSH-Tray
 nix develop
 cargo run
 ```
 
-Click the tray icon, then choose a host. Use **Open Panel** to manage hosts and keys, **Refresh** to reload hosts manually, and **Quit** to exit. There is no background scanning.
+Click the tray icon and select a host. Choose **Open Panel** to manage hosts and keys, **Refresh** to reload the config manually, or **Quit** to exit.
 
-## Management panel
+Open the management panel directly during development:
 
-Choose **Open Panel** from the tray menu, or run `ssh-tray --panel`. The native egui window uses a custom dark theme and Phosphor icons. Search hosts by alias or group; **Cmd/Ctrl+F** focuses search and **Escape** clears it.
+```sh
+cargo run -- --panel
+```
 
-The panel provides:
+## Build
 
-- Host **Add / Edit / Delete** forms for aliases, HostName, User, Port, IdentityFile, and network group. Edits preserve advanced options such as `ProxyJump`, `ProxyCommand`, and `RemoteCommand`.
-- Grouped hosts with **Connect**, **Copy SSH Command**, and **Install on Server** (`ssh-copy-id`).
-- Public-key fingerprints and comments with **Copy Public Key** and **Edit Public Comment**.
-- Ed25519 key generation, existing key-pair import, interactive passphrase changes, and confirmed key-pair removal.
+### macOS app bundle
 
-Key generation, passphrase changes, and server installation open Terminal for secure secret entry or authentication. The panel never displays private keys or handles their passphrases. Import expects a private key with a sibling `.pub` file and never overwrites existing keys. Generated or imported keys appear after **Refresh**.
+```sh
+nix develop --command ./scripts/package-macos.sh
+open "target/SSH Tray.app"
+```
 
-Example SSH config:
+The bundle uses `LSUIElement`, so SSH Tray runs in the menu bar without a Dock icon. Local builds are unsigned; macOS may require approval under **System Settings → Privacy & Security**.
+
+### Linux release binary
+
+```sh
+nix develop
+cargo build --release
+./target/release/ssh-tray
+```
+
+Open only the management panel:
+
+```sh
+./target/release/ssh-tray --panel
+```
+
+## SSH host configuration
+
+SSH Tray reads standard OpenSSH aliases and options. For example:
 
 ```sshconfig
-Host dev
-    HostName 192.168.1.20
-    User alice
+# ssh-tray:group Development
+Host dev-api
+    HostName dev.example.com
+    User developer
+    Port 22
     IdentityFile ~/.ssh/id_ed25519
 
-Host prod
-    HostName example.com
+Host staging
+    HostName staging.example.com
+    User developer
+    Port 22
+
+# ssh-tray:group Production
+Host prod-web
+    HostName 192.0.2.20
     User deploy
+    Port 22
 ```
 
-Wildcard and negated `Host` patterns are intentionally omitted from the menu. To avoid duplicate machines, only the first alias from each `Host` block appears in the tray and panel; other aliases remain in the config, work in Terminal, and stay editable in the host form. If no config exists, create one with `touch ~/.ssh/config` and add an alias like the example above.
+A `# ssh-tray:group <name>` comment applies to following hosts until the next group directive. An empty `# ssh-tray:group` returns subsequent hosts to the top level. SSH ignores these comments.
 
-## Network groups
+Wildcard and negated `Host` patterns are omitted from the interface. For a block such as `Host macstudio studio`, only `macstudio` appears in the app; both aliases remain usable with `ssh`, and both remain editable in the host form.
 
-Add a comment directive before one or more `Host` blocks to place their aliases in a submenu:
+## Panel workflows
 
-```sshconfig
-# ssh-tray:group Office
-Host macstudio studio
-    HostName 202.72.223.27
+### Hosts
 
-# ssh-tray:group Cloudflare
-Host kurnia-mac
-    HostName ssh.kurniatech.my.id
+- **Connect:** open Terminal with `ssh <alias>`.
+- **Copy SSH Command:** copy the exact connection command.
+- **Add / Edit:** manage aliases, HostName, User, Port, IdentityFile, and group.
+- **Delete:** confirm removal of the entire host block, including every alias in that block.
+- **Install on Server:** select a public key and run `ssh-copy-id` for the selected host.
+
+### SSH keys
+
+| Action | Behavior |
+|---|---|
+| Copy Public Key | Copy only the `.pub` contents |
+| Generate Key | Create Ed25519 keys through interactive `ssh-keygen` |
+| Import Key | Import a private key and its sibling `.pub` without overwriting |
+| Edit Public Comment | Change only the public-key comment; key data stays unchanged |
+| Change Passphrase | Open interactive `ssh-keygen -p` in Terminal |
+| Remove Key Pair | Delete private and public files after explicit confirmation |
+
+Imported private keys use mode `0600`; public keys use `0644`.
+
+## Security and privacy
+
+- Private-key contents are never displayed in the panel.
+- Passphrases and server authentication are entered only in Terminal.
+- SSH Tray does not store credentials or embed a separate SSH client.
+- Existing keys are never overwritten during generation or import.
+- Config updates use a sibling temporary file and atomic rename while preserving permissions.
+- Hosts and keys refresh only on launch or when you click **Refresh**.
+- Documentation screenshots use disposable demo data, never your real SSH configuration.
+
+## Development
+
+Enter the Nix shell:
+
+```sh
+nix develop
 ```
 
-The group applies to following hosts until the next `# ssh-tray:group <name>` directive. An empty `# ssh-tray:group` directive returns subsequent hosts to the top-level menu. These comments are ignored by SSH.
+Run checks:
 
-## Checks
+```sh
+cargo test
+cargo-fmt -- --check
+cargo-clippy clippy -- -D warnings
+```
+
+Or run them without entering the shell:
 
 ```sh
 nix develop --command cargo test
@@ -69,16 +161,21 @@ nix develop --command cargo-fmt -- --check
 nix develop --command cargo-clippy clippy -- -D warnings
 ```
 
-## Build an app bundle
+## Project structure
 
-```sh
-nix develop --command ./scripts/package-macos.sh
-open "target/SSH Tray.app"
+```text
+src/
+  app.rs       Tray icon and menu events
+  panel.rs     Native egui management panel
+  config.rs    SSH config parsing and atomic host CRUD
+  keys.rs      Public-key inventory and safe key-file operations
+  terminal.rs  Secure macOS/Linux terminal commands
+assets/
+  tray-icon.rgba
+  sidebar-demo.png
+packaging/
+  Info.plist
+scripts/
+  package-macos.sh
+flake.nix      macOS and Linux development shells
 ```
-
-The bundle uses `LSUIElement`, so it appears in the menu bar without a Dock icon. It is an unsigned local build; macOS may require approving it in System Settings > Privacy & Security.
-
-## Development environment
-
-`flake.nix` supplies the Rust toolchain and native build tools. The application itself is Rust with `tao` and `tray-icon`; it does not embed an SSH client or store credentials.
-# SSH-Tray
