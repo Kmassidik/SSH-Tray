@@ -167,14 +167,15 @@ nix develop --command cargo-clippy clippy --all-targets --features panel -- -D w
 
 The always-running tray and on-demand panel are separate executables. The tray does not link `eframe`, `egui`, `rfd`, or `tao` on macOS; it uses AppKit directly. Release builds use thin LTO, one codegen unit, symbol stripping, and abort-on-panic.
 
-Measured on Apple Silicon:
+Measured release builds:
 
-| Component | Binary size | Private footprint | RSS |
+| Component | Binary size | Private memory | RSS |
 |---|---:|---:|---:|
-| Native tray | 456 KB | 9.8 MB | 43.8 MB |
-| Management panel | 4.7 MB | 98 MB | 114 MB |
+| macOS native tray | 456 KB | 9.8 MB | 43.8 MB |
+| Intel Linux tray | 1012 KB | 11.8 MB | 27.9 MB |
+| macOS management panel | 4.7 MB | 98 MB | 114 MB |
 
-RSS includes shared macOS GUI frameworks; private footprint is the more useful measure for comparing native application memory. A sub-1 MB graphical macOS process is not realistic. Keeping the panel closed avoids its memory cost entirely.
+RSS includes shared GUI frameworks; private memory is the more useful measure for comparing application-owned memory. Linux private memory is the sum of `Private_Clean` and `Private_Dirty` from `smaps_rollup`. A sub-1 MB graphical process is not realistic, but the tray binaries themselves are approximately 0.5–1 MB. Keeping the panel closed avoids its memory cost entirely.
 
 ## Project structure
 
